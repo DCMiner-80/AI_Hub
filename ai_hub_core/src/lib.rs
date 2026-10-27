@@ -211,3 +211,24 @@ impl LocalCandleEngine {
     }
 }
 
+
+
+pub struct ArchitectureTemplate;
+
+impl ArchitectureTemplate {
+    /// Formats a raw user query string using the exact template specs of the targeted model profile
+    pub fn format_prompt(model_id: &str, system_prompt: &str, user_query: &str) -> String {
+        if model_id.contains("Llama") {
+            format!(
+                "<|start_header_id|>system<|end_header_id|>\n\n{}<|eot_id|><|start_header_id|>user<|end_header_id|>\n\n{}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n",
+                system_prompt, user_query
+            )
+        } else if model_id.contains("Mistral") {
+            format!("<s>[INST] {} \n\n {} [/INST]", system_prompt, user_query)
+        } else if model_id.contains("Phi") {
+            format!("<|system|>\n{}<|end|>\n<|user|>\n{}<|end|>\n<|assistant|>\n", system_prompt, user_query)
+        } else {
+            format!("System: {}\nUser: {}\nAssistant:", system_prompt, user_query)
+        }
+    }
+}
