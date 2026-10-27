@@ -232,3 +232,72 @@ impl ArchitectureTemplate {
         }
     }
 }
+
+
+pub struct HermesAgentAdapter {
+    pub session_id: String,
+    pub environment_path: std::path::PathBuf,
+}
+
+impl HermesAgentAdapter {
+    pub fn new(environment_path: std::path::PathBuf) -> Self {
+        Self {
+            session_id: "hermes-core-secure-sandbox".to_string(),
+            environment_path,
+        }
+    }
+}
+
+impl ModelAdapter for HermesAgentAdapter {
+    fn name(&self) -> String { "NousResearch-Hermes-Agent-Core".to_string() }
+    fn info(&self) -> ModelInfo {
+        ModelInfo {
+            id: "hermes-agent-autonomous-loop".to_string(),
+            name: "Hermes Self-Improving Agent System".to_string(),
+        }
+    }
+
+    fn generate_stream(
+        &self,
+        prompt: &str,
+        _options: InferenceOptions,
+        tx: tokio::sync::mpsc::Sender<String>,
+    ) -> Result<(), String> {
+        let prompt_str = prompt.to_string();
+        let target_bin = self.environment_path.join("bin").join("hermes.exe");
+        
+        std::thread::spawn(move || {
+            let _ = tx.blocking_send("\n>>> [HERMES AGENT INTERFACE] Spawning autonomous loop process...\n".to_string());
+            
+            // Execute the native hermes background binary utility pipeline pass
+            let mut cmd = std::process::Command::new("hermes")
+                .arg("chat")
+                .arg("--prompt")
+                .arg(&prompt_str)
+                .stdout(std::process::Stdio::piped())
+                .stderr(std::process::Stdio::piped())
+                .spawn();
+
+            match cmd {
+                Ok(mut child) => {
+                    if let Some(stdout) = child.stdout.take() {
+                        let mut reader = std::io::BufReader::new(stdout);
+                        let mut buffer = [0; 512];
+                        // Continuous character typewriter loop mapping over streamed stdout data
+                        while let Ok(count) = reader.read(&mut buffer) {
+                            if count == 0 { break; }
+                            if let Ok(text_slice) = std::str::from_utf8(&buffer[..count]) {
+                                let _ = tx.blocking_send(text_slice.to_string());
+                            }
+                        }
+                    }
+                    let _ = child.wait();
+                }
+                Err(_) => {
+                    let _ = tx.blocking_send("\n>>> [ERROR] Hermes execution failure. Make sure 'iex (irm https://nousresearch.com)' has been run locally.\n".to_string());
+                }
+            }
+        });
+        Ok(())
+    }
+}
