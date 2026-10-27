@@ -30,7 +30,9 @@ impl DownloadScheduler {
             loop {
                 let next = { let mut g = q.lock().unwrap(); g.pop_front() };
                 if let Some(model_id) = next {
-                    spawn_download(manifest.clone(), model_id, dest.clone(), tx.clone());
+                    if let Ok(manifest_struct) = ai_hub_core::downloader::ModelsManifest::from_file(&manifest) {
+                        spawn_download(manifest_struct, model_id, dest.clone(), tx.clone());
+                    }
                     thread::sleep(Duration::from_secs(2));
                 } else {
                     thread::sleep(Duration::from_secs(1));
@@ -39,3 +41,4 @@ impl DownloadScheduler {
         });
     }
 }
+

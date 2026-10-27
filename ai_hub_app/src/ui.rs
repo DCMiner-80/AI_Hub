@@ -64,7 +64,7 @@ impl AppState {
 
 pub fn ui_update(app: &mut AppState, ctx: &egui::Context) {
     // Set up a standard channel to catch models returning from the background thread
-    let (hf_tx, hf_rx) = std::sync::mpsc::channel::<Vec<ai_hub_core::HFModelInfo>>();
+    let (_hf_tx, hf_rx) = std::sync::mpsc::channel::<Vec<ai_hub_core::HFModelInfo>>();
     
     // Check for search response data sent back from the background thread without locking the frame
     if let Ok(found_models) = hf_rx.try_recv() {
@@ -322,6 +322,7 @@ pub fn render_download_progress_bar(ui: &mut egui::Ui, progress: &DownloadProgre
         ui.add_space(4.0);
     });
 }
+
 
 
 
