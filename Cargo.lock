@@ -138,6 +138,7 @@ dependencies = [
  "candle-transformers",
  "reqwest",
  "serde",
+ "serde_json",
  "tokio",
 ]
 

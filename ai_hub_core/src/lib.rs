@@ -104,7 +104,7 @@ pub trait ModelAdapter: Send + Sync {
     fn generate_stream(
         &self,
         prompt: &str,
-        options: InferenceOptions,
+        _options: InferenceOptions,
         tx: tokio::sync::mpsc::Sender<String>,
     ) -> Result<(), String>;
 }
@@ -128,7 +128,7 @@ impl ModelAdapter for LoadedLocalModel {
     fn generate_stream(
         &self,
         prompt: &str,
-        options: InferenceOptions,
+        _options: InferenceOptions,
         tx: tokio::sync::mpsc::Sender<String>,
     ) -> Result<(), String> {
         let mut engine = LocalCandleEngine::load_gguf_model(&self.file_path)?;
@@ -192,3 +192,4 @@ impl LocalCandleEngine {
         Ok(next_token)
     }
 }
+
