@@ -63,6 +63,10 @@ impl AppState {
 }
 
 pub fn ui_update(app: &mut AppState, ctx: &egui::Context) {
+    // Actively pump message queues from background parallel workers
+    if let Some(panel) = &mut app.downloads_panel {
+        panel.poll();
+    }
     // Set up a standard channel to catch models returning from the background thread
     let (_hf_tx, hf_rx) = std::sync::mpsc::channel::<Vec<ai_hub_core::HFModelInfo>>();
     
@@ -173,7 +177,11 @@ pub fn ui_update(app: &mut AppState, ctx: &egui::Context) {
     });
 
     if app.show_downloads {
-        if let Some(panel) = &mut app.downloads_panel { panel.ui(ctx); }
+        if let Some(panel) = &mut app.downloads_panel {
+            egui::CentralPanel::default().show(ctx, |ui| {
+                panel.ui(ui);
+            });
+        }
     }
 
     egui::CentralPanel::default().show(ctx, |ui| {
@@ -322,6 +330,8 @@ pub fn render_download_progress_bar(ui: &mut egui::Ui, progress: &DownloadProgre
         ui.add_space(4.0);
     });
 }
+
+
 
 
 
