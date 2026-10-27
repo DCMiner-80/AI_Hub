@@ -43,11 +43,24 @@ impl DownloadsPanel {
         }
     }
 
-    // Feature 1: Draws download fractions live onto the active panel overlay
-    pub fn ui(&mut self, ui: &mut egui::Ui) {
+    pub fn ui(&mut self, ui: &mut egui::Ui, app_state: &mut crate::ui::AppState) {
         ui.vertical(|ui| {
-            ui.heading("Parallel Download Space Manager");
+            ui.heading("Configuration & Download Settings");
             ui.separator();
+
+            // Custom models directory configuration picker widget 
+            ui.horizontal(|ui| {
+                ui.label("Models Path:");
+                ui.label(egui::RichText::new(self.models_dir.to_string_lossy()).color(egui::Color32::from_rgb(0, 255, 0)));
+                
+                if ui.button("📁 Change Location").clicked() {
+                    if let Some(path) = rfd::FileDialog::new().pick_folder() {
+                        self.models_dir = path;
+                    }
+                }
+            });
+
+            ui.add_space(10.0);
 
             if let Some((downloaded, total)) = self.progress {
                 let id = self.downloading_id.clone().unwrap_or_else(|| "Unknown".to_string());
@@ -56,23 +69,29 @@ impl DownloadsPanel {
                     bytes_downloaded: downloaded,
                     total_bytes: total,
                 };
-                // Render the live egui custom progress bar component directly
                 render_download_progress_bar(ui, &progress_struct);
             } else {
                 ui.label("No active download streams running over background CDN channels.");
             }
 
             ui.add_space(10.0);
-            if ui.button("Trigger Llama Manifest Pre-fetch Sync").clicked() {
-                let model_url = "https://huggingface.co"; // Target model mirror URL
+            
+            if ui.button("⚡ Trigger Llama Manifest Pre-fetch Sync").clicked() {
+                let model_url = "https://huggingface.co";
                 
-                // Fallback Verification Gatekeeper Check
                 if let Some(cached_path) = ai_hub_core::LocalCandleEngine::verify_local_binary_exists(&self.models_dir, model_url) {
-                    println!("Gatekeeper: Local model cache verified at {:?}. Skipping network download.", cached_path);
-                    // Add direct trace confirmation line here or trigger immediate local engine loading mapping
+                    // Reset typewriter streamer parameters to print verification path live onto the console
+                    app_state.output.clear();
+                    app_state.stream_index = 0;
+                    app_state.full_target_response = format!(
+                        "\n>>> [GATEKEEPER VERIFICATION] SUCCESS\n>>> Local model cached weights verified.\n>>> Path: {}\n>>> System bypassing remote calls. Loading local engine blocks offline...\n",
+                        cached_path.to_string_lossy()
+                    );
                 } else {
                     if let Some(ref s) = self.scheduler {
-                        println!("Gatekeeper: Local binary not found on disk. Initiating parallel CDN streaming channels...");
+                        app_state.output.clear();
+                        app_state.stream_index = 0;
+                        app_state.full_target_response = "\n>>> [GATEKEEPER] Local binary not found on storage paths.\n>>> Initializing parallel chunked CDN download pipelines...\n".to_string();
                         s.enqueue("Llama-3.2-1B-Instruct-Q4_K_M".to_string());
                     }
                 }
@@ -80,4 +99,3 @@ impl DownloadsPanel {
         });
     }
 }
-

@@ -63,6 +63,13 @@ impl AppState {
 }
 
 pub fn ui_update(app: &mut AppState, ctx: &egui::Context) {
+    // Live Typewriter Text Streamer
+    if app.stream_index < app.full_target_response.chars().count() {
+        let chars: Vec<char> = app.full_target_response.chars().collect();
+        app.output.push(chars[app.stream_index]);
+        app.stream_index += 1;
+        ctx.request_repaint(); // Explicitly force frame repaint timer event
+    }
     // Actively pump message queues from background parallel workers
     if let Some(panel) = &mut app.downloads_panel {
         panel.poll();
@@ -179,7 +186,7 @@ pub fn ui_update(app: &mut AppState, ctx: &egui::Context) {
     if app.show_downloads {
         if let Some(panel) = &mut app.downloads_panel {
             egui::CentralPanel::default().show(ctx, |ui| {
-                panel.ui(ui);
+                panel.ui(ui, app);
             });
         }
     }
@@ -330,6 +337,8 @@ pub fn render_download_progress_bar(ui: &mut egui::Ui, progress: &DownloadProgre
         ui.add_space(4.0);
     });
 }
+
+
 
 
 
