@@ -56,7 +56,7 @@ pub mod downloader {
         manifest: &ModelsManifest,
         model_id: &str,
         dest_dir: &Path,
-        callback: Arc<dyn Fn(u64, u64) + Send + Sync>
+        progress_trigger: Arc<dyn Fn(u64, u64) + Send + Sync + 'static>
     ) -> Result<(), String> {
         let model = manifest.models.iter()
             .find(|m| m.id == model_id)
@@ -70,15 +70,13 @@ pub mod downloader {
         rt.block_on(async {
             let client = reqwest::Client::new();
             
-            // 1. Discover full byte length size from target endpoint headers
             let response = client.head(&url).send().await.map_err(|e| e.to_string())?;
             let total_size = response.headers()
                 .get(reqwest::header::CONTENT_LENGTH)
                 .and_then(|ct| ct.to_str().ok())
                 .and_then(|s| s.parse::<u64>().ok())
-                .ok_or_else(|| "Failed to obtain content length range properties from host remote server".to_string())?;
+                .ok_or_else(|| "Failed to obtain content length properties from host remote server".to_string())?;
 
-            // 2. Provision empty destination container file map on native Windows storage path
             tokio::fs::create_dir_all(dest_dir).await.map_err(|e| e.to_string())?;
             let file = OpenOptions::new()
                 .write(true)
@@ -88,7 +86,6 @@ pub mod downloader {
                 .map_err(|e| e.to_string())?;
             file.set_len(total_size).await.map_err(|e| e.to_string())?;
 
-            // 3. Orchestrate 4 distributed chunk parallel workers using Range Headers
             let chunk_count = 4u64;
             let chunk_size = total_size / chunk_count;
             let downloaded_bytes = Arc::new(AtomicU64::new(0));
@@ -102,7 +99,7 @@ pub mod downloader {
                 let url_clone = url.clone();
                 let path_clone = output_path.clone();
                 let downloaded_counter = downloaded_bytes.clone();
-                let cb_clone = callback.clone();
+                let progress_clone = progress_trigger.clone();
 
                 tasks.push(tokio::spawn(async move {
                     let req = client_clone.get(&url_clone)
@@ -117,7 +114,9 @@ pub mod downloader {
                                     if out_file.write_all(&chunk_data).await.is_ok() {
                                         let len = chunk_data.len() as u64;
                                         let overall = downloaded_counter.fetch_add(len, Ordering::SeqCst) + len;
-                                        cb_clone(overall, total_size);
+                                        
+                                        // Fire unified callback down the background worker task thread
+                                        progress_clone(overall, total_size);
                                     } else { break; }
                                 }
                             }
@@ -270,7 +269,7 @@ impl ModelAdapter for LocalCandleEngine {
 
                 if let Ok(text_fragment) = tokenizer.decode(&[next_token], true) {
                     if tx.send(text_fragment).await.is_err() {
-                        break; 
+                        break;
                     }
                 }
                 
