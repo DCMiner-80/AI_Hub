@@ -64,10 +64,20 @@ impl DownloadsPanel {
 
             ui.add_space(10.0);
             if ui.button("Trigger Llama Manifest Pre-fetch Sync").clicked() {
-                if let Some(ref s) = self.scheduler {
-                    s.enqueue("Llama-3.2-1B-Instruct-Q4_K_M".to_string());
+                let model_url = "https://huggingface.co"; // Target model mirror URL
+                
+                // Fallback Verification Gatekeeper Check
+                if let Some(cached_path) = ai_hub_core::LocalCandleEngine::verify_local_binary_exists(&self.models_dir, model_url) {
+                    println!("Gatekeeper: Local model cache verified at {:?}. Skipping network download.", cached_path);
+                    // Add direct trace confirmation line here or trigger immediate local engine loading mapping
+                } else {
+                    if let Some(ref s) = self.scheduler {
+                        println!("Gatekeeper: Local binary not found on disk. Initiating parallel CDN streaming channels...");
+                        s.enqueue("Llama-3.2-1B-Instruct-Q4_K_M".to_string());
+                    }
                 }
             }
         });
     }
 }
+

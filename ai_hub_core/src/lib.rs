@@ -197,3 +197,16 @@ impl LocalCandleEngine {
         Ok(next_token)
     }
 }
+
+impl LocalCandleEngine {
+    /// Validation Gatekeeper: Checks if a model file name already resides on disk
+    pub fn verify_local_binary_exists<P: AsRef<Path>>(dest_dir: P, model_url: &str) -> Option<std::path::PathBuf> {
+        let file_name = model_url.split('/').last().unwrap_or("model.gguf");
+        let local_path = dest_dir.as_ref().join(file_name);
+        if local_path.exists() && local_path.is_file() {
+            Some(local_path)
+        } else {
+            None
+        }
+    }
+}
