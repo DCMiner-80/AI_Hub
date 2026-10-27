@@ -1,4 +1,4 @@
-﻿use eframe::egui;
+use eframe::egui;
 use std::sync::Arc;
 use ai_hub_core::ModelAdapter;
 use crate::worker::{TaskSender, UiMessage};
@@ -86,17 +86,17 @@ pub fn ui_update(app: &mut AppState, ctx: &egui::Context) {
 
     egui::SidePanel::left("left_panel").resizable(false).default_width(200.0).show(ctx, |ui| {
         ui.add_space(5.0);
-        ui.heading("📁 Workspace Menu");
+        ui.heading("?? Workspace Menu");
         ui.separator();
 
-        ui.checkbox(&mut app.show_downloads, "🛠️ Show Downloader Panel");
+        ui.checkbox(&mut app.show_downloads, "??? Show Downloader Panel");
         ui.add_space(15.0);
 
         ui.label("Available Loaded Models:");
         for a in &app.adapters {
             let info = a.info();
             let is_selected = app.selected.as_ref().map(|s| s == &info.id).unwrap_or(false);
-            if ui.selectable_label(is_selected, format!("🤖 {}", info.name)).clicked() {
+            if ui.selectable_label(is_selected, format!("?? {}", info.name)).clicked() {
                 app.selected = Some(info.id.clone());
             }
         }
@@ -108,13 +108,13 @@ pub fn ui_update(app: &mut AppState, ctx: &egui::Context) {
 
     egui::CentralPanel::default().show(ctx, |ui| {
         ui.add_space(5.0);
-        ui.heading("💻 AI Hub - Local Text Terminal");
+        ui.heading("?? AI Hub - Local Text Terminal");
         ui.separator();
 
         if let Some(selected_model) = &app.selected {
             ui.label(format!("Active Selected Engine: {}", selected_model));
         } else {
-            ui.colored_label(egui::Color32::YELLOW, "⚠️ Please click and highlight a model engine from your left sidebar first.");
+            ui.colored_label(egui::Color32::YELLOW, "?? Please click and highlight a model engine from your left sidebar first.");
         }
         ui.add_space(10.0);
 
@@ -139,7 +139,7 @@ pub fn ui_update(app: &mut AppState, ctx: &egui::Context) {
                     .desired_width(ui.available_width() - 90.0)
             );
 
-            if ui.button("🚀 Send").clicked() || (text_box.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter))) {
+            if ui.button("?? Send").clicked() || (text_box.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter))) {
                 if !app.prompt.is_empty() {
                     if let Some(model_id) = &app.selected {
                         let expected_file_path = models_dir.join(format!("{}.bin", model_id));
@@ -150,11 +150,11 @@ pub fn ui_update(app: &mut AppState, ctx: &egui::Context) {
                                     Ok(inference_response) => {
                                         app.full_target_response = format!(
                                             "[ONNX HARDWARE ACCELERATION CORE VERIFIED]\nInput String Array: {}\n\n{}", 
-                                            app.prompt, inference_response
+                                            app.prompt, inference_response.text
                                         );
                                     }
                                     Err(err) => {
-                                        app.full_target_response = format!("❌ ONNX Execution Runtime Error: {}", err);
+                                        app.full_target_response = format!("? ONNX Execution Runtime Error: {}", err);
                                     }
                                 }
                             }
@@ -162,7 +162,7 @@ pub fn ui_update(app: &mut AppState, ctx: &egui::Context) {
                             app.output.clear();
                         } else {
                             app.full_target_response = format!(
-                                "❌ [BLOCKED - ENGINE NOT DOWNLOADED]\nCannot run prompt sequence. The weights file for '{}' is missing from local application directories.\nExpected location: {:?}\n\nPlease turn on the Download Manager subpanel and download this model first!", 
+                                "? [BLOCKED - ENGINE NOT DOWNLOADED]\nCannot run prompt sequence. The weights file for '{}' is missing from local application directories.\nExpected location: {:?}\n\nPlease turn on the Download Manager subpanel and download this model first!", 
                                 model_id, expected_file_path
                             );
                             app.stream_index = 0;
