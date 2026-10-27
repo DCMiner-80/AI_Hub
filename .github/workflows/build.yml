@@ -1,0 +1,28 @@
+﻿name: Windows App Compiler Pipeline
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  compile_binaries:
+    name: Build Native Windows Binaries
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout Code Repository Trace Lines
+      uses: actions/checkout@v4
+
+    - name: Initialize Rust Toolchain Cache
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Populate Dependency Caches
+      uses: Swatinem/rust-cache@v2
+
+    - name: Run Release Compilation Pipeline
+      run: cargo build --release --verbose
