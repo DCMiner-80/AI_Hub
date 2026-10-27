@@ -1,11 +1,12 @@
 ﻿use std::path::PathBuf;
 use std::sync::mpsc::Sender;
-use ai_hub_core::downloader::{ModelsManifest, download_and_extract_model, list_models, ModelEntry};
+use ai_hub_core::downloader::{ModelsManifest, download_and_extract_model};
 use anyhow::Result;
 use std::thread;
 use std::sync::Arc;
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub enum DownloadMsg {
     Progress { id: String, downloaded: u64, total: u64 },
     Done { id: String, ok: Result<(), String> },

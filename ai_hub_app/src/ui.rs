@@ -5,6 +5,7 @@ use crate::worker::{TaskSender, UiMessage};
 use std::sync::{Mutex, mpsc};
 use crate::ui_downloads::DownloadsPanel;
 
+#[allow(dead_code)]
 pub struct AppState {
     pub adapters: Vec<Arc<dyn ModelAdapter>>,
     pub selected: Option<String>,
@@ -47,7 +48,7 @@ pub fn ui_update(app: &mut AppState, ctx: &egui::Context) {
     }
 
     if app.stream_index < app.full_target_response.len() {
-        app.stream_index += 2; // Speeds up the typing visual loop slightly
+        app.stream_index += 2; 
         if app.stream_index > app.full_target_response.len() {
             app.stream_index = app.full_target_response.len();
         }
@@ -144,9 +145,7 @@ pub fn ui_update(app: &mut AppState, ctx: &egui::Context) {
                         let expected_file_path = models_dir.join(format!("{}.bin", model_id));
                         
                         if expected_file_path.exists() {
-                            // Find the matching adapter inside the state tracking vectors array
                             if let Some(adapter) = app.adapters.iter().find(|a| a.info().id == *model_id) {
-                                // Triggering the real underlying execution tensor processing algorithm loop
                                 match adapter.run_inference(&app.prompt) {
                                     Ok(inference_response) => {
                                         app.full_target_response = format!(

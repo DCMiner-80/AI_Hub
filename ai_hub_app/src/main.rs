@@ -1,4 +1,5 @@
-﻿#![windows_subsystem = "windows"]
+﻿#![allow(dead_code, unused_imports)]
+#![windows_subsystem = "windows"]
 
 mod ui;
 mod worker;
@@ -57,3 +58,4 @@ fn main() -> Result<(), eframe::Error> {
         }),
     )
 }
+
