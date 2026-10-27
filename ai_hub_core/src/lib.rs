@@ -9,7 +9,6 @@ use candle_transformers::generation::LogitsProcessor;
 use tokenizers::Tokenizer;
 use futures_util::StreamExt;
 
-// --- EXPLICIT COMPATIBILITY WITH ORIGINAL DOWNLOADER API ---
 pub mod downloader {
     use super::*;
     use std::path::Path;
@@ -78,6 +77,7 @@ pub mod downloader {
                 .ok_or_else(|| "Failed to obtain content length properties from host remote server".to_string())?;
 
             tokio::fs::create_dir_all(dest_dir).await.map_err(|e| e.to_string())?;
+            
             let file = OpenOptions::new()
                 .write(true)
                 .create(true)
@@ -114,8 +114,6 @@ pub mod downloader {
                                     if out_file.write_all(&chunk_data).await.is_ok() {
                                         let len = chunk_data.len() as u64;
                                         let overall = downloaded_counter.fetch_add(len, Ordering::SeqCst) + len;
-                                        
-                                        // Fire unified callback down the background worker task thread
                                         progress_clone(overall, total_size);
                                     } else { break; }
                                 }

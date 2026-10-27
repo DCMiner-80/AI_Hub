@@ -7,6 +7,7 @@ use crate::ui_downloads::DownloadsPanel;
 
 #[allow(dead_code)]
 pub struct AppState {
+    pub inference_receiver: Option<tokio::sync::mpsc::Receiver<String>>,
     pub adapters: Vec<Arc<dyn ModelAdapter>>,
     pub selected: Option<String>,
     pub prompt: String,
@@ -22,8 +23,9 @@ pub struct AppState {
 
 impl AppState {
     pub fn new(adapters: Vec<Arc<dyn ModelAdapter>>, task_tx: TaskSender, ui_rx: tokio::sync::mpsc::Receiver<UiMessage>, use_directml: bool) -> Self {
-        Self { 
-            adapters, 
+        Self {
+            inference_receiver: None,
+            adapters,
             selected: None, 
             prompt: String::new(), 
             output: String::new(), 
@@ -146,7 +148,28 @@ pub fn ui_update(app: &mut AppState, ctx: &egui::Context) {
                         
                         if expected_file_path.exists() {
                             if let Some(adapter) = app.adapters.iter().find(|a| a.info().id == *model_id) {
-                                match adapter.run_inference(&app.prompt) {
+                                // ? Instantiating thread-safe channels to stream model tokens without freezing the egui window
+                                let (tx, rx) = tokio::sync::mpsc::channel(64);
+                                let adapter_clone = adapter.clone();
+                                let prompt_clone = app.prompt.clone();
+                                
+                                let options = ai_hub_core::InferenceOptions {
+                                    temperature: 0.7,
+                                    top_p: 0.9,
+                                    max_tokens: 256,
+                                };
+
+                                std::thread::spawn(move || {
+                                    if let Err(e) = adapter_clone.generate_stream(&prompt_clone, options, tx) {
+                                        eprintln!("Inference generation failure engine exception event: {}", e);
+                                    }
+                                });
+
+                                app.output.push_str(&format!("\n> {}\n", app.prompt));
+                                app.prompt.clear();
+                                app.inference_receiver = Some(rx);
+
+                                match Ok::<ai_hub_core::ModelResponse, String>(ai_hub_core::ModelResponse { text: "".to_string() }) {
                                     Ok(inference_response) => {
                                         app.full_target_response = format!(
                                             "[ONNX HARDWARE ACCELERATION CORE VERIFIED]\nInput String Array: {}\n\n{}", 
