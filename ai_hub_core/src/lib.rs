@@ -2,6 +2,7 @@
 use std::sync::mpsc::Sender;
 use std::sync::Arc;
 use std::path::Path;
+use std::io::{Write, Read};
 
 use candle_core::{Device, Tensor};
 use candle_transformers::generation::LogitsProcessor;
@@ -16,18 +17,61 @@ pub mod downloader {
     }
 
     impl ModelsManifest {
-        pub fn from_file<P: AsRef<Path>>(_path: P) -> Result<Self, String> {
-            Ok(Self { models: vec![] })
+        pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, String> {
+            if path.as_ref().exists() {
+                let file_str = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
+                serde_json::from_str(&file_str).map_err(|e| e.to_string())
+            } else {
+                // Return a default manifest pointing to real, lightweight Llama quantized options
+                Ok(Self {
+                    models: vec![
+                        ModelInfo {
+                            id: "Llama-3-8B-Instruct-Q4".to_string(),
+                            name: "https://huggingface.co".to_string(),
+                        }
+                    ]
+                })
+            }
         }
     }
 
-    // Fixed: Changed from async to a normal synchronous function to match your app's caller pattern
+    /// Downloads the Llama model file while streaming progress bytes back to the egui dashboard layout
     pub fn download_and_extract_model(
         _manifest: &ModelsManifest,
-        _model_id: &str,
-        _dest: &Path,
-        _cb: Arc<dyn Fn(u64, u64) + Send + Sync>
+        model_url: &str,
+        dest_dir: &Path,
+        cb: Arc<dyn Fn(u64, u64) + Send + Sync>
     ) -> Result<OkMarker, String> {
+        let client = reqwest::blocking::Client::builder()
+            .user_agent("AI-Hub-Desktop-App")
+            .build()
+            .map_err(|e| e.to_string())?;
+
+        // Determine destination file layout parameters safely
+        let file_name = model_url.split('/').last().unwrap_or("model.gguf");
+        let output_path = dest_dir.join(file_name);
+        
+        std::fs::create_dir_all(dest_dir).map_err(|e| e.to_string())?;
+        let mut file = std::fs::File::create(output_path).map_err(|e| e.to_string())?;
+
+        // Send a request to fetch the content length size context
+        let mut response = client.get(model_url).send().map_err(|e| e.to_string())?;
+        let total_size = response.content_length().unwrap_or(0);
+
+        let mut buffer = vec![0; 16384];
+        let mut downloaded: u64 = 0;
+
+        loop {
+            let byte_count = response.read(&mut buffer).map_err(|e| e.to_string())?;
+            if byte_count == 0 { break; }
+            
+            file.write_all(&buffer[..byte_count]).map_err(|e| e.to_string())?;
+            downloaded += byte_count as u64;
+            
+            // Invoke callback to trigger real-time repaint frames on the UI view panel
+            cb(downloaded, total_size);
+        }
+
         Ok(OkMarker)
     }
 }
@@ -51,7 +95,7 @@ pub struct InferenceOptions {
     pub prompt: String,
     pub temperature: Option<f32>,
     pub top_p: Option<f32>,
-    pub max_tokens: usize, // Fixed: Restored field to clear the missing field compilation error
+    pub max_tokens: usize,
 }
 
 pub trait ModelAdapter: Send + Sync {
@@ -67,25 +111,35 @@ pub trait ModelAdapter: Send + Sync {
 
 pub struct LoadedLocalModel {
     pub name: String,
+    pub file_path: std::path::PathBuf,
 }
 
 impl LoadedLocalModel {
-    pub fn new(name: String, _path: std::path::PathBuf) -> Self {
-        Self { name }
+    pub fn new(name: String, path: std::path::PathBuf) -> Self {
+        Self { name, file_path: path }
     }
 }
 
 impl ModelAdapter for LoadedLocalModel {
     fn name(&self) -> String { self.name.clone() }
     fn info(&self) -> ModelInfo {
-        ModelInfo { id: self.name.clone(), name: self.name.clone() }
+        ModelInfo { id: self.name.clone(), name: self.file_path.to_string_lossy().into_owned() }
     }
     fn generate_stream(
         &self,
-        _prompt: &str,
-        _options: InferenceOptions,
-        _tx: tokio::sync::mpsc::Sender<String>,
+        prompt: &str,
+        options: InferenceOptions,
+        tx: tokio::sync::mpsc::Sender<String>,
     ) -> Result<(), String> {
+        let mut engine = LocalCandleEngine::load_gguf_model(&self.file_path)?;
+        // Simple mock tokenizer representation for example prompt maps
+        let dummy_tokens = vec![1u32, 2u32, 3u32]; 
+        
+        let _ = tx.blocking_send(format!(" [Evaluating weights offline via Llama core engine...] \nPrompt received: {}\n", prompt));
+        
+        if let Ok(token) = engine.generate_next_token(&dummy_tokens, 0) {
+            let _ = tx.blocking_send(format!("Generated next token ID matching: {}\n", token));
+        }
         Ok(())
     }
 }
