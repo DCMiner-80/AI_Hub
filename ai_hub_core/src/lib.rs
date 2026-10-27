@@ -76,8 +76,8 @@ impl ModelAdapter for LoadedLocalModel {
         let input_matrix = onnxruntime::ndarray::Array2::from_shape_vec((1, token_len), tokens)
             .map_err(|e| anyhow::anyhow!("Tensor shape mapping error: {}", e))?;
 
-        // Pass the properly formatted matrix array to the ONNX session
-        let outputs = session.run(vec![input_matrix])?;
+        // FIX: Explicitly specify the output tensor array type to guide the compiler
+        let outputs: Vec<onnxruntime::tensor::OrtOwnedTensor<f32, _>> = session.run(vec![input_matrix])?;
 
         if let Some(_first_output) = outputs.first() {
             Ok(format!("[ONNX Trace Active]: Generation complete! Prompt metadata processed safely through localized hardware channels."))
