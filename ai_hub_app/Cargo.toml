@@ -1,0 +1,15 @@
+﻿[package]
+name = "ai_hub_app"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+eframe = "0.22"
+egui = "0.22"
+tokio = { version = "1", features = ["rt", "macros"] }
+ai_hub_core = { path = "../ai_hub_core" }
+anyhow = "1.0"
+dirs = "5.0"
+crossbeam-channel = "0.5"
+serde = { version = "1.0", features = ["derive"] }
+winapi = { version = "0.3", features = ["winuser", "windef", "wingdi"] }

@@ -1,0 +1,5 @@
+﻿target/
+**/*.pdb
+**/*.download
+**/*.bin
+.gitattributes
