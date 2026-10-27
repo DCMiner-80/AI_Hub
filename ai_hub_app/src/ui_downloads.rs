@@ -75,27 +75,39 @@ impl DownloadsPanel {
             }
 
             ui.add_space(10.0);
-            
-            if ui.button("⚡ Trigger Llama Manifest Pre-fetch Sync").clicked() {
-                let model_url = "https://huggingface.co";
-                
-                if let Some(cached_path) = ai_hub_core::LocalCandleEngine::verify_local_binary_exists(&self.models_dir, model_url) {
-                    // Reset typewriter streamer parameters to print verification path live onto the console
-                    app_state.output.clear();
-                    app_state.stream_index = 0;
-                    app_state.full_target_response = format!(
-                        "\n>>> [GATEKEEPER VERIFICATION] SUCCESS\n>>> Local model cached weights verified.\n>>> Path: {}\n>>> System bypassing remote calls. Loading local engine blocks offline...\n",
-                        cached_path.to_string_lossy()
-                    );
-                } else {
-                    if let Some(ref s) = self.scheduler {
-                        app_state.output.clear();
-                        app_state.stream_index = 0;
-                        app_state.full_target_response = "\n>>> [GATEKEEPER] Local binary not found on storage paths.\n>>> Initializing parallel chunked CDN download pipelines...\n".to_string();
-                        s.enqueue("Llama-3.2-1B-Instruct-Q4_K_M".to_string());
-                    }
+            ui.heading("Available Architecture Profiles");
+            ui.small("Select a profile to verify local files or trigger a resumable download stream:");
+            ui.add_space(4.0);
+
+            // Fetch manifest list dynamically
+            if let Ok(manifest) = ai_hub_core::downloader::ModelsManifest::from_file(&self.manifest_path) {
+                for model in manifest.models {
+                    ui.horizontal(|ui| {
+                        ui.label(format!("• {}", model.id));
+                        if ui.button("⚡ Sync Profile").clicked() {
+                            if let Some(cached_path) = ai_hub_core::LocalCandleEngine::verify_local_binary_exists(&self.models_dir, &model.name) {
+                                app_state.output.clear();
+                                app_state.stream_index = 0;
+                                app_state.full_target_response = format!(
+                                    "\n>>> [GATEKEEPER VERIFICATION] SUCCESS\n>>> {} verified locally.\n>>> Path: {}\n>>> Loading engine layers offline...\n",
+                                    model.id, cached_path.to_string_lossy()
+                                );
+                            } else {
+                                if let Some(ref s) = self.scheduler {
+                                    app_state.output.clear();
+                                    app_state.stream_index = 0;
+                                    app_state.full_target_response = format!(
+                                        "\n>>> [GATEKEEPER] Local cache miss for {}.\n>>> Pulling weights from mirror endpoint...\n",
+                                        model.id
+                                    );
+                                    s.enqueue(model.name.clone());
+                                }
+                            }
+                        }
+                    });
                 }
             }
         });
     }
 }
+

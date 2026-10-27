@@ -184,10 +184,11 @@ pub fn ui_update(app: &mut AppState, ctx: &egui::Context) {
     });
 
     if app.show_downloads {
-        if let Some(panel) = &mut app.downloads_panel {
+        if let Some(mut panel) = app.downloads_panel.take() {
             egui::CentralPanel::default().show(ctx, |ui| {
                 panel.ui(ui, app);
             });
+            app.downloads_panel = Some(panel);
         }
     }
 
@@ -337,6 +338,7 @@ pub fn render_download_progress_bar(ui: &mut egui::Ui, progress: &DownloadProgre
         ui.add_space(4.0);
     });
 }
+
 
 
 
