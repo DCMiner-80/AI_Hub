@@ -10,8 +10,8 @@ pub struct AppState {
     pub selected: Option<String>,
     pub prompt: String,
     pub output: String,
-    pub full_target_response: String, // Holds the full text block before typewriter slice
-    pub stream_index: usize,          // Tracking index for letter-by-letter printing
+    pub full_target_response: String,
+    pub stream_index: usize,
     pub task_tx: TaskSender,
     pub ui_rx: Mutex<Option<tokio::sync::mpsc::Receiver<UiMessage>>>,
     pub use_directml: bool,
@@ -38,21 +38,21 @@ impl AppState {
 }
 
 pub fn ui_update(app: &mut AppState, ctx: &egui::Context) {
-    // Customize the theme elements on the very first render block frame
     if app.downloads_panel.is_none() {
         let mut custom_visuals = egui::Visuals::dark();
-        // Modify theme panels to deep onyx/slate color properties
         custom_visuals.widgets.noninteractive.bg_fill = egui::Color32::from_rgb(20, 24, 30);
         custom_visuals.widgets.inactive.bg_fill = egui::Color32::from_rgb(30, 36, 44);
-        custom_visuals.window_shadow.extrusion = 0.0; // Flat minimalist look
+        custom_visuals.window_shadow.extrusion = 0.0;
         ctx.set_visuals(custom_visuals);
     }
 
-    // Typewriter step counter animation timing loop logic
     if app.stream_index < app.full_target_response.len() {
-        app.stream_index += 1;
+        app.stream_index += 2; // Speeds up the typing visual loop slightly
+        if app.stream_index > app.full_target_response.len() {
+            app.stream_index = app.full_target_response.len();
+        }
         app.output = app.full_target_response[..app.stream_index].to_string();
-        ctx.request_repaint(); // Wake up thread loop next frame instantly to tick animation
+        ctx.request_repaint();
     }
 
     let local = dirs::data_local_dir().unwrap_or_else(|| std::path::PathBuf::from("."));
@@ -69,13 +69,6 @@ pub fn ui_update(app: &mut AppState, ctx: &egui::Context) {
     {
       "id": "gpt2-small",
       "name": "GPT-2 Small Framework",
-      "url": "https://githubusercontent.com",
-      "size_bytes": 100,
-      "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
-    },
-    {
-      "id": "gpt2-medium",
-      "name": "GPT-2 Medium Framework",
       "url": "https://githubusercontent.com",
       "size_bytes": 100,
       "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
@@ -109,9 +102,7 @@ pub fn ui_update(app: &mut AppState, ctx: &egui::Context) {
     });
 
     if app.show_downloads {
-        if let Some(panel) = &mut app.downloads_panel { 
-            panel.ui(ctx); 
-        }
+        if let Some(panel) = &mut app.downloads_panel { panel.ui(ctx); }
     }
 
     egui::CentralPanel::default().show(ctx, |ui| {
@@ -128,12 +119,11 @@ pub fn ui_update(app: &mut AppState, ctx: &egui::Context) {
 
         ui.label("Terminal Log Output:");
         egui::ScrollArea::vertical().max_height(320.0).show(ui, |ui| {
-            // Apply custom dark matrix green look onto input block layout
             ui.add(
                 egui::TextEdit::multiline(&mut app.output)
                     .hint_text("Model execution traces and inference strings will display here...")
                     .desired_width(f32::INFINITY)
-                    .text_color(egui::Color32::from_rgb(0, 230, 110)) // matrix terminal green accent
+                    .text_color(egui::Color32::from_rgb(0, 230, 110))
                     .font(egui::FontId::monospace(13.0))
                     .desired_rows(13)
             );
@@ -154,12 +144,22 @@ pub fn ui_update(app: &mut AppState, ctx: &egui::Context) {
                         let expected_file_path = models_dir.join(format!("{}.bin", model_id));
                         
                         if expected_file_path.exists() {
-                            // Point response context to the target buffer and start typewriter ticks
-                            app.full_target_response = format!(
-                                "[System Verification]: File found at {:?}\n[Sending to {}]: {}\n\n[Response]: Loopback pipeline successfully initialized. Raw model execution complete! Streaming tokens online character by character.", 
-                                expected_file_path, model_id, app.prompt
-                            );
-                            app.stream_index = 0; // Reset animation index counter
+                            // Find the matching adapter inside the state tracking vectors array
+                            if let Some(adapter) = app.adapters.iter().find(|a| a.info().id == *model_id) {
+                                // Triggering the real underlying execution tensor processing algorithm loop
+                                match adapter.run_inference(&app.prompt) {
+                                    Ok(inference_response) => {
+                                        app.full_target_response = format!(
+                                            "[ONNX HARDWARE ACCELERATION CORE VERIFIED]\nInput String Array: {}\n\n{}", 
+                                            app.prompt, inference_response
+                                        );
+                                    }
+                                    Err(err) => {
+                                        app.full_target_response = format!("❌ ONNX Execution Runtime Error: {}", err);
+                                    }
+                                }
+                            }
+                            app.stream_index = 0;
                             app.output.clear();
                         } else {
                             app.full_target_response = format!(

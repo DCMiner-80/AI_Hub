@@ -7,7 +7,7 @@ mod download_scheduler;
 mod ui_downloads;
 
 use crate::ui::{AppState, ui_update};
-use ai_hub_core::{LoadedLocalModel, ModelInfo};
+use ai_hub_core::LoadedLocalModel;
 use std::sync::Arc;
 
 fn main() -> Result<(), eframe::Error> {
@@ -16,22 +16,17 @@ fn main() -> Result<(), eframe::Error> {
     
     let task_sender_wrapped = worker::TaskSender { tx: task_tx };
     
-    // Register your local engines directly into the vector array pipeline
+    let local = dirs::data_local_dir().unwrap_or_else(|| std::path::PathBuf::from("."));
+    let models_dir = local.join("AI_Hub_App").join("models");
+
+    // Register active ONNX backends into your state controller
     let active_models: Vec<Arc<dyn ai_hub_core::ModelAdapter>> = vec![
-        Arc::new(LoadedLocalModel {
-            metadata: ModelInfo {
-                id: "gpt2-small".to_string(),
-                name: "GPT-2 Small".to_string(),
-                vendor: "OpenAI".to_string(),
-            }
-        }),
-        Arc::new(LoadedLocalModel {
-            metadata: ModelInfo {
-                id: "gpt2-medium".to_string(),
-                name: "GPT-2 Medium".to_string(),
-                vendor: "OpenAI".to_string(),
-            }
-        })
+        Arc::new(LoadedLocalModel::new(
+            "gpt2-small",
+            "GPT-2 Small Framework",
+            "OpenAI",
+            models_dir.join("gpt2-small.bin")
+        ))
     ];
     
     let app_state = AppState::new(
