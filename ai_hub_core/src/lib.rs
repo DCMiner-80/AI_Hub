@@ -64,14 +64,20 @@ impl ModelAdapter for LoadedLocalModel {
             .with_number_threads(2)?
             .with_model_from_file(&self.model_path)?;
 
-        // Convert the prompt character bytes into valid model float arrays
+        // Convert the prompt character bytes into a flat sequence vector
         let mut tokens: Vec<f32> = prompt.bytes().map(|b| b as f32).collect();
         if tokens.is_empty() {
-            tokens.push(0.0); // Ensure a non-empty fallback element buffer
+            tokens.push(0.0);
         }
 
-        // Pass direct input arrays matching the configuration parameters of the underlying model signature
-        let outputs = session.run(vec![tokens])?;
+        let token_len = tokens.len();
+
+        // Convert the flat vector into a 2D Array matrix shaped [1, token_count]
+        let input_matrix = onnxruntime::ndarray::Array2::from_shape_vec((1, token_len), tokens)
+            .map_err(|e| anyhow::anyhow!("Tensor shape mapping error: {}", e))?;
+
+        // Pass the properly formatted matrix array to the ONNX session
+        let outputs = session.run(vec![input_matrix])?;
 
         if let Some(_first_output) = outputs.first() {
             Ok(format!("[ONNX Trace Active]: Generation complete! Prompt metadata processed safely through localized hardware channels."))
