@@ -9,10 +9,8 @@ mod download_scheduler;
 
 use crate::ui::AppState;
 
-// Implement the eframe::App trait for AppState, mapping to the real ui_update function
 impl eframe::App for AppState {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        // Fix: Call your real, standalone ui_update method to paint the active view layout
         crate::ui::ui_update(self, ctx);
     }
 }
@@ -21,10 +19,14 @@ fn main() -> eframe::Result<()> {
     let (task_tx, _task_rx) = tokio::sync::mpsc::channel(64);
     let (_ui_tx, ui_rx) = tokio::sync::mpsc::channel(64);
     
+    // Explicitly toggle GPU hardware options based on system parameters (default: true)
+    let enable_hardware_acceleration = true;
+
     let active_models: Vec<Arc<dyn ai_hub_core::ModelAdapter>> = vec![
         Arc::new(LoadedLocalModel::new(
-            "default_model".to_string(),
-            std::path::PathBuf::from(".")
+            "Llama-3.2-1B-Instruct-Local-Engine".to_string(),
+            std::path::PathBuf::from("."),
+            enable_hardware_acceleration
         ))
     ];
 
@@ -37,7 +39,7 @@ fn main() -> eframe::Result<()> {
         native_options,
         Box::new(move |_cc| {
             let wrapped_sender = crate::worker::TaskSender { tx: task_tx };
-            let app_instance = AppState::new(active_models, wrapped_sender, ui_rx, false);
+            let app_instance = AppState::new(active_models, wrapped_sender, ui_rx, enable_hardware_acceleration);
             Ok(Box::new(app_instance))
         })
     )

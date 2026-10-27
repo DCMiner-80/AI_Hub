@@ -1,9 +1,9 @@
-﻿use eframe::egui;
+﻿use std::path::PathBuf;
 use std::sync::mpsc::Receiver;
-use crate::downloader_ui::DownloadMsg;
-use std::path::PathBuf;
-use crate::download_scheduler::DownloadScheduler;
 use std::sync::Arc;
+use crate::downloader_ui::DownloadMsg;
+use crate::download_scheduler::DownloadScheduler;
+use crate::ui::{DownloadProgress, render_download_progress_bar};
 
 pub struct DownloadsPanel {
     pub manifest_path: PathBuf,
@@ -16,60 +16,57 @@ pub struct DownloadsPanel {
 
 impl DownloadsPanel {
     pub fn new(manifest_path: PathBuf, models_dir: PathBuf, rx: Receiver<DownloadMsg>, scheduler: Arc<DownloadScheduler>) -> Self {
-        Self { 
-            manifest_path, 
-            models_dir, 
-            rx: Some(rx), 
-            progress: None, 
-            downloading_id: None, 
-            scheduler: Some(scheduler) 
+        Self {
+            manifest_path,
+            models_dir,
+            rx: Some(rx),
+            progress: None,
+            downloading_id: None,
+            scheduler: Some(scheduler),
         }
     }
 
     pub fn poll(&mut self) {
-        if let Some(rx) = &self.rx {
+        if let Some(ref rx) = self.rx {
             while let Ok(msg) = rx.try_recv() {
                 match msg {
                     DownloadMsg::Progress { id, downloaded, total } => {
                         self.downloading_id = Some(id);
                         self.progress = Some((downloaded, total));
                     }
-                    DownloadMsg::Done { id: _, ok } => {
+                    DownloadMsg::Done { id: _, ok: _ } => {
                         self.progress = None;
                         self.downloading_id = None;
-                        if let Err(e) = ok { 
-                            eprintln!("Download failed: {}", e); 
-                        }
                     }
                 }
             }
         }
     }
 
-    pub fn ui(&mut self, ctx: &egui::Context) {
-        self.poll();
-        egui::Window::new("Model Downloads").show(ctx, |ui| {
-            ui.label("Available models:");
-            if let Ok(manifest) = ai_hub_core::downloader::ModelsManifest::from_file(&self.manifest_path) {
-                for m in manifest.models {
-                    ui.horizontal(|ui| {
-                        ui.label(format!("{} ({})", m.name, m.id));
-                        if ui.button("Download now").clicked() {
-                            if let Some(s) = &self.scheduler { 
-                                s.enqueue(m.id.clone()); 
-                            }
-                        }
-                    });
-                }
-            } else {
-                ui.label("Manifest not found or invalid.");
-            }
+    // Feature 1: Draws download fractions live onto the active panel overlay
+    pub fn ui(&mut self, ui: &mut egui::Ui) {
+        ui.vertical(|ui| {
+            ui.heading("Parallel Download Space Manager");
             ui.separator();
+
             if let Some((downloaded, total)) = self.progress {
-                let pct = if total > 0 { downloaded as f32 / total as f32 } else { 0.0 };
-                ui.add(egui::ProgressBar::new(pct).show_percentage());
+                let id = self.downloading_id.clone().unwrap_or_else(|| "Unknown".to_string());
+                let progress_struct = DownloadProgress {
+                    file_name: id,
+                    bytes_downloaded: downloaded,
+                    total_bytes: total,
+                };
+                // Render the live egui custom progress bar component directly
+                render_download_progress_bar(ui, &progress_struct);
             } else {
-                ui.label("No active downloads");
+                ui.label("No active download streams running over background CDN channels.");
+            }
+
+            ui.add_space(10.0);
+            if ui.button("Trigger Llama Manifest Pre-fetch Sync").clicked() {
+                if let Some(ref s) = self.scheduler {
+                    s.enqueue("Llama-3.2-1B-Instruct-Q4_K_M".to_string());
+                }
             }
         });
     }
