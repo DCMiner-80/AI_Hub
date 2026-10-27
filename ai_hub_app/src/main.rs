@@ -1,61 +1,44 @@
-﻿#![allow(dead_code, unused_imports)]
-#![windows_subsystem = "windows"]
+﻿use std::sync::Arc;
+use ai_hub_core::LoadedLocalModel;
 
 mod ui;
 mod worker;
 mod downloader_ui;
-mod download_scheduler;
 mod ui_downloads;
+mod download_scheduler;
 
-use crate::ui::{AppState, ui_update};
-use ai_hub_core::LoadedLocalModel;
-use std::sync::Arc;
+use crate::ui::AppState;
 
-fn main() -> Result<(), eframe::Error> {
-    let (task_tx, _task_rx) = tokio::sync::mpsc::channel(32);
-    let (_ui_tx, ui_rx) = tokio::sync::mpsc::channel(32);
-    
-    let task_sender_wrapped = worker::TaskSender { tx: task_tx };
-    
-    let local = dirs::data_local_dir().unwrap_or_else(|| std::path::PathBuf::from("."));
-    let models_dir = local.join("AI_Hub_App").join("models");
-
-    // Register active ONNX backends into your state controller
-    let active_models: Vec<Arc<dyn ai_hub_core::ModelAdapter>> = vec![
-        Arc::new(LoadedLocalModel::new(
-            "gpt2-small",
-            "GPT-2 Small Framework",
-            "OpenAI",
-            models_dir.join("gpt2-small.bin")
-        ))
-    ];
-    
-    let app_state = AppState::new(
-        active_models, 
-        task_sender_wrapped, 
-        ui_rx, 
-        false 
-    );
-
-    let options = eframe::NativeOptions {
-        initial_window_size: Some(eframe::egui::vec2(800.0, 600.0)),
-        ..Default::default()
-    };
-
-    eframe::run_native(
-        "AI Hub - Model Downloader",
-        options,
-        Box::new(|_cc| {
-            struct MainApp {
-                state: AppState,
-            }
-            impl eframe::App for MainApp {
-                fn update(&mut self, ctx: &eframe::egui::Context, _frame: &mut eframe::Frame) {
-                    ui_update(&mut self.state, ctx);
-                }
-            }
-            Box::new(MainApp { state: app_state })
-        }),
-    )
+// Implement the eframe::App trait for AppState, mapping to the real ui_update function
+impl eframe::App for AppState {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        // Fix: Call your real, standalone ui_update method to paint the active view layout
+        crate::ui::ui_update(self, ctx);
+    }
 }
 
+fn main() -> eframe::Result<()> {
+    let (task_tx, _task_rx) = tokio::sync::mpsc::channel(64);
+    let (_ui_tx, ui_rx) = tokio::sync::mpsc::channel(64);
+    
+    let active_models: Vec<Arc<dyn ai_hub_core::ModelAdapter>> = vec![
+        Arc::new(LoadedLocalModel::new(
+            "default_model".to_string(),
+            std::path::PathBuf::from(".")
+        ))
+    ];
+
+    let mut native_options = eframe::NativeOptions::default();
+    native_options.viewport = egui::ViewportBuilder::default()
+        .with_inner_size(egui::vec2(1024.0, 768.0));
+
+    eframe::run_native(
+        "AI Hub - Desktop Model Downloader & Terminal",
+        native_options,
+        Box::new(move |_cc| {
+            let wrapped_sender = crate::worker::TaskSender { tx: task_tx };
+            let app_instance = AppState::new(active_models, wrapped_sender, ui_rx, false);
+            Ok(Box::new(app_instance))
+        })
+    )
+}
