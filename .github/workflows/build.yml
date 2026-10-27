@@ -16,7 +16,7 @@ jobs:
 
     steps:
     - name: Checkout Code Repository Trace Lines
-      uses: actions/checkout@v4
+      uses: actions/checkout@v4.2.2 # Explicitly pins an updated runner checkout link
 
     - name: Initialize Rust Toolchain Cache
       uses: dtolnay/rust-toolchain@stable
@@ -34,7 +34,7 @@ jobs:
       shell: powershell
 
     - name: Package Executable into Distributed Download Release
-      uses: softprops/action-gh-release@v2
+      uses: softprops/action-gh-release@v2.0.9 # Explicitly pins an updated release module
       with:
         tag_name: ${{ steps.tag.outputs.release_tag }}
         name: AI Hub Desktop Engine Build ${{ steps.tag.outputs.release_tag }}
