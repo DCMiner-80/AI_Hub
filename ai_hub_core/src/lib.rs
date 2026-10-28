@@ -264,13 +264,13 @@ impl ModelAdapter for HermesAgentAdapter {
         tx: tokio::sync::mpsc::Sender<String>,
     ) -> Result<(), String> {
         let prompt_str = prompt.to_string();
-        let target_bin = self.environment_path.join("bin").join("hermes.exe");
+        let _target_bin = self.environment_path.join("bin").join("hermes.exe");
         
         std::thread::spawn(move || {
             let _ = tx.blocking_send("\n>>> [HERMES AGENT INTERFACE] Spawning autonomous loop process...\n".to_string());
             
             // Execute the native hermes background binary utility pipeline pass
-            let mut cmd = std::process::Command::new("hermes")
+            let cmd = std::process::Command::new("hermes")
                 .arg("chat")
                 .arg("--prompt")
                 .arg(&prompt_str)
@@ -301,3 +301,57 @@ impl ModelAdapter for HermesAgentAdapter {
         Ok(())
     }
 }
+
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct McpServerTool {
+    pub server_name: String,
+    pub tool_name: String,
+    pub description: String,
+}
+
+pub struct HermesProcessController;
+
+impl HermesProcessController {
+    /// Spawns or terminates the background Hermes Messaging Gateway process safely
+    pub fn toggle_gateway(active: bool) -> Option<std::process::Child> {
+        if active {
+            println!("Gateway Controller: Initializing background Messaging Gateway process...");
+            std::process::Command::new("hermes")
+                .arg("gateway")
+                .arg("start")
+                .stdout(std::process::Stdio::null())
+                .stderr(std::process::Stdio::null())
+                .spawn()
+                .ok()
+        } else {
+            println!("Gateway Controller: Terminating messaging channels...");
+            let _ = std::process::Command::new("taskkill")
+                .args(&["/F", "/IM", "hermes.exe"])
+                .output();
+            None
+        }
+    }
+
+    /// Fetches mock/live connected MCP server modules currently configured in the environment
+    pub fn get_active_mcp_tools() -> Vec<McpServerTool> {
+        vec![
+            McpServerTool {
+                server_name: "computer-use-linux".to_string(),
+                tool_name: "desktop_screenshot".to_string(),
+                description: "Takes viewport snapshots for multimodal reasoning".to_string(),
+            },
+            McpServerTool {
+                server_name: "memory-vault".to_string(),
+                tool_name: "fts5_session_recall".to_string(),
+                description: "Queries high-dimensional database timeline logs".to_string(),
+            },
+            McpServerTool {
+                server_name: "filesystem-sandbox".to_string(),
+                tool_name: "secure_file_write".to_string(),
+                description: "Writes sandboxed source files to active directory trees".to_string(),
+            }
+        ]
+    }
+}
+

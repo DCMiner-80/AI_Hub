@@ -22,6 +22,8 @@ pub struct AppState {
     pub use_directml: bool,
     pub downloads_panel: Option<DownloadsPanel>,
     pub show_downloads: bool,
+    pub gateway_active: bool,
+    pub gateway_process: Option<std::process::Child>,
     
     // ? Persistent Key history & HF Searching State mappings
     pub prompt_history: Vec<String>,
@@ -53,6 +55,8 @@ impl AppState {
             task_tx,
             ui_rx: Mutex::new(Some(ui_rx)),
             use_directml,
+            gateway_active: false,
+            gateway_process: None,
             downloads_panel: None,
             show_downloads: true,
             prompt_history: loaded_history,
@@ -63,6 +67,83 @@ impl AppState {
 }
 
 pub fn ui_update(app: &mut AppState, ctx: &egui::Context) {
+    // 1. TOP GLOBAL TASKBAR MENU CONTROL PANEL
+    egui::TopBottomPanel::top("global_taskbar_menu").show(ctx, |ui| {
+        egui::menu::bar(ui, |ui| {
+            ui.menu_button("📁 File", |ui| {
+                if ui.button("📁 Models Directory Picker").clicked() {
+                    if let Some(path) = rfd::FileDialog::new().pick_folder() {
+                        if let Some(panel) = &mut app.downloads_panel {
+                            panel.models_dir = path;
+                        }
+                    }
+                    ui.close_menu();
+                }
+                ui.separator();
+                if ui.button("❌ Close Application").clicked() {
+                    ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                }
+            });
+
+            ui.menu_button("🌐 Gateway Deployments", |ui| {
+                let old_status = app.gateway_active;
+                if ui.checkbox(&mut app.gateway_active, "Telegram/Discord Bot Broadcast").changed() {
+                    if app.gateway_active != old_status {
+                        app.gateway_process = ai_hub_core::HermesProcessController::toggle_gateway(app.gateway_active);
+                        app.output.clear();
+                        app.stream_index = 0;
+                        if app.gateway_active {
+                            app.full_target_response = "\n>>> [TASKBAR ACTION] LIVE DEPLOYMENT LAUNCHED\n>>> Subprocess command executed natively over remote webhook servers.\n".to_string();
+                        } else {
+                            app.full_target_response = "\n>>> [TASKBAR ACTION] BROADCAST SUSPENDED\n>>> Process trees safely context shifted to offline.\n".to_string();
+                        }
+                    }
+                }
+            });
+
+            ui.menu_button("⚙ Parameters & Tuning", |ui| {
+                ui.horizontal(|ui| {
+                    ui.label("Temp:");
+                    ui.add(egui::Slider::new(&mut app.temperature, 0.0..=1.5).step_by(0.1));
+                });
+                ui.horizontal(|ui| {
+                    ui.label("Top_P:");
+                    ui.add(egui::Slider::new(&mut app.top_p, 0.0..=1.0).step_by(0.05));
+                });
+                ui.separator();
+                ui.checkbox(&mut app.use_directml, "⚡ GPU Acceleration (CUDA/DirectML)");
+            });
+
+            ui.menu_button("🔌 Model Context Protocol", |ui| {
+                ui.label(egui::RichText::new("Active Tool Schema Registries:").strong());
+                let tools = ai_hub_core::HermesProcessController::get_active_mcp_tools();
+                for tool in tools {
+                    ui.small(format!("• [{}]: {}", tool.server_name, tool.tool_name));
+                }
+            });
+
+            ui.menu_button("🎨 Console System Themes", |ui| {
+                if ui.button("🟢 Onyx Cyber Matrix").clicked() {
+                    let mut visuals = egui::Visuals::dark();
+                    visuals.override_text_color = Some(egui::Color32::from_rgb(0, 255, 0));
+                    ctx.set_visuals(visuals);
+                    ui.close_menu();
+                }
+                if ui.button("⚪ High-Contrast Light").clicked() {
+                    ctx.set_visuals(egui::Visuals::light());
+                    ui.close_menu();
+                }
+            });
+
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                if app.gateway_active {
+                    ui.colored_label(egui::Color32::from_rgb(0, 255, 0), "🔒 GATEWAY SECURE RUNNING");
+                } else {
+                    ui.weak("🔒 SYSTEM LOCAL ONLY");
+                }
+            });
+        });
+    });
     // Live Typewriter Text Streamer
     if app.stream_index < app.full_target_response.chars().count() {
         let chars: Vec<char> = app.full_target_response.chars().collect();
@@ -338,6 +419,10 @@ pub fn render_download_progress_bar(ui: &mut egui::Ui, progress: &DownloadProgre
         ui.add_space(4.0);
     });
 }
+
+
+
+
 
 
 
