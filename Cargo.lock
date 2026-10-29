@@ -126,6 +126,7 @@ dependencies = [
  "eframe",
  "egui",
  "rfd",
+ "serde",
  "serde_json",
  "sysinfo",
  "tokio",

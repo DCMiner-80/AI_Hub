@@ -1,6 +1,7 @@
 ﻿use crate::downloader_ui::DownloadMsg;
 use std::process::Stdio;
 use tokio::io::{AsyncBufReadExt, BufReader};
+use serde::Deserialize;
 
 #[allow(dead_code)]
 pub enum UiMessage {
@@ -11,6 +12,33 @@ pub enum UiMessage {
 #[allow(dead_code)]
 pub struct TaskSender {
     pub tx: tokio::sync::mpsc::Sender<String>,
+}
+
+/// Declarative macro plugin to parse structured tool JSON payloads into matching Rust types.
+/// Handles string pattern tokens, parsing diagnostics, and structural fallbacks automatically.
+#[macro_export]
+macro_rules! parse_tool_json {
+    ($json_str:expr, $target_type:ty) => {{
+        match serde_json::from_str::<$target_type>($json_str) {
+            Ok(parsed_data) => Some(parsed_data),
+            Err(err) => {
+                println!("[MACRO ERROR] Failed to parse tool payload: {}", err);
+                None
+            }
+        }
+    }};
+}
+
+// Primitives to represent tool outputs coming back from the explorer tools
+#[derive(Deserialize, Debug, Clone)]
+pub struct ToolSchemaInfo {
+    pub name: String,
+    pub description: String,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct ExplorerToolListPayload {
+    pub tools: Vec<ToolSchemaInfo>,
 }
 
 /// Fully integrated async worker loop that maps UI prompts to local engines and the Claude Code MCP subsystem
@@ -51,6 +79,13 @@ pub async fn run_worker_loop(
                 let mut reader = BufReader::new(stdout).lines();
                 while let Ok(Some(line)) = reader.next_line().await {
                     println!("[Claude Code Output] {}", line);
+                    
+                    // Example processing hook using your custom macro plugin layout:
+                    if line.starts_with("{") && line.ends_with("}") {
+                        if let Some(payload) = parse_tool_json!(&line, ExplorerToolListPayload) {
+                            println!("[Macro Parse Success] Detected {} explorer tools.", payload.tools.len());
+                        }
+                    }
                 }
             }
         }
