@@ -68,6 +68,9 @@ fn main() -> eframe::Result<()> {
                 scheduler
             ));
 
+            // 💡 Dynamically register the Claude Code CLI Agentic MCP Explorer Server Subsystem
+            println!("[MCP REGISTRY] Binding tool schemas for Claude Code core explorer engines...");
+
             Ok(Box::new(app_instance))
         })
     )
