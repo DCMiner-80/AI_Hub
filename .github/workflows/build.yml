@@ -1,0 +1,43 @@
+﻿name: Windows App Compiler Pipeline
+
+on:
+  push:
+    branches: [ "main" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  compile_binaries:
+    name: Build Native Windows Binaries
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+    - name: Checkout Code Repository Trace Lines
+      uses: actions/checkout@v4.2.2 # Explicitly pins an updated runner checkout link
+
+    - name: Initialize Rust Toolchain Cache
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Clean Out Corrupted Local Compilation Caches
+      run: cargo clean
+      shell: powershell
+
+    - name: Run Release Compilation Pipeline
+      run: cargo build --release --verbose
+
+    - name: Generate Unique Timestamp Release Tag
+      id: tag
+      run: echo "release_tag=v1.0.$(Get-Date -Format 'yyyyMMdd.HHmmss')" >> $env:GITHUB_OUTPUT
+      shell: powershell
+
+    - name: Package Executable into Distributed Download Release
+      uses: softprops/action-gh-release@v2.0.9 # Explicitly pins an updated release module
+      with:
+        tag_name: ${{ steps.tag.outputs.release_tag }}
+        name: AI Hub Desktop Engine Build ${{ steps.tag.outputs.release_tag }}
+        draft: false
+        prerelease: false
+        files: target/release/ai_hub_app.exe
