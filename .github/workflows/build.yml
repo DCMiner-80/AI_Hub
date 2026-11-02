@@ -1,0 +1,48 @@
+﻿name: Build & Publish Release Binaries
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    name: Package Executable Build
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Source Code Tree
+        uses: actions/checkout@v4
+
+      - name: Install Stable Rust Toolchain Engine
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust Workspace Build Cache Management
+        uses: Swatinem/rust-cache@v2
+
+      - name: Compile Optimized Production Binary Layout
+        run: cargo build --release
+
+      - name: Bundle Production Distribution Packages
+        run: |
+          mkdir dist
+          cp .\target\release\ai_hub_app.exe .\dist\ai_hub_app.exe
+          cp .\README.md .\dist\README.md
+          cp .\LICENSE .\dist\LICENSE
+          Compress-Archive -Path .\dist\* -DestinationPath .\ai_hub_app_windows_x64.zip
+
+      - name: Publish Compiled Binary Package Asset onto GitHub Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ai_hub_app_windows_x64.zip
+          name: AI Hub Desktop Release ${{ github.ref_name }}
+          body: |
+            ## 🚀 Automated Production Binary Asset Bundle
+            Official release assets generated automatically by the pipeline workspace engines.
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

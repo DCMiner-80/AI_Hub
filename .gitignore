@@ -1,0 +1,10 @@
+﻿target/
+**/*.pdb
+**/*.download
+**/*.bin
+.gitattributes
+
+/target/
+*.bin
+*.gguf
+*.json

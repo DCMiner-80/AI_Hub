@@ -1,0 +1,3 @@
+﻿[workspace]
+members = ["ai_hub_core", "ai_hub_app"]
+resolver = "2"
